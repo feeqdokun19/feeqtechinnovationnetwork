@@ -1,4 +1,4 @@
-const API_URL = "http://13.60.41.217/api";
+const API_URL = "/api";
 
 type RequestOptions = RequestInit & {
   auth?: boolean;
