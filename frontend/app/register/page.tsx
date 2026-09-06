@@ -38,13 +38,12 @@ export default function RegisterPage() {
       }>("/auth/register", {
         method: "POST",
         body: JSON.stringify({
-          name,
-          email,
-          phone: phone || undefined,
-          password,
-          role,
-        }),
-      });
+        fullName: name,
+        email,
+        phone: phone || undefined,
+        password,
+        role,
+      }),
 
       saveAuth(data);
 
