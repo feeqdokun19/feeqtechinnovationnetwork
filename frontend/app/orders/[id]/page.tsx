@@ -24,12 +24,13 @@ type Order = {
       email: string;
     };
   };
-  transaction?: {
-    id: string;
-    status: string;
-    reference?: string | null;
-    amount?: number | string;
-  } | null;
+  
+transaction?: {
+  id: string;
+  status: string;
+  paymentReference?: string | null;
+  amount?: number | string;
+} | null;
 };
 
 function formatCurrency(amount: number | string) {
@@ -147,40 +148,52 @@ async function handleReviewSubmit() {
 
 
   useEffect(() => {
-    const user = getStoredUser();
+  const user = getStoredUser();
 
-    if (!user) {
-      router.push("/login");
-      return;
+  if (!user) {
+    router.push("/login");
+    return;
+  }
+
+  if (orderId) {
+    loadOrder();
+  }
+}, [orderId, router])
+
+
+async function loadOrder() {
+  try {
+    setLoading(true);
+    setError("");
+
+    const data = await apiRequest<Order>(
+      `/orders/${orderId}`,
+      {
+        auth: true,
+      },
+    );
+
+    setOrder(data);
+
+    const paymentStatus =
+      new URLSearchParams(window.location.search).get("payment");
+
+    if (
+      paymentStatus === "success" &&
+      data.status === "PAID"
+    ) {
+      setPaymentError("");
     }
+  } catch (err) {
+    setError(
+      err instanceof Error
+        ? err.message
+        : "Unable to load order.",
+    );
+  } finally {
+    setLoading(false);
+  }
 
-    if (orderId) {
-      loadOrder();
-    }
-  }, [orderId, router]);
-
-  async function loadOrder() {
-    try {
-      setLoading(true);
-      setError("");
-
-      const data = await apiRequest<Order>(
-        `/orders/${orderId}`,
-        {
-          auth: true,
-        },
-      );
-
-      setOrder(data);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to load order.",
-      );
-    } finally {
-      setLoading(false);
-    }
   }
 
   if (loading) {
@@ -195,7 +208,11 @@ async function handleReviewSubmit() {
     );
   }
 
-  if (error || !order) {
+  if (error || !order) {        
+
+
+
+
     return (
       <main className="min-h-screen bg-slate-50 p-6">
         <div className="mx-auto max-w-4xl">
@@ -341,11 +358,11 @@ async function handleReviewSubmit() {
                 </span>
               </p>
 
-              {order.transaction?.reference && (
-                <p className="mt-1 text-xs text-slate-500">
-                  Reference: {order.transaction.reference}
-                </p>
-              )}
+              {order.transaction?.paymentReference && (
+               <p className="mt-1 text-xs text-slate-500">
+                 Reference: {order.transaction.paymentReference}
+               </p> 
+                )}
             </div>
 
            {order.status === "PENDING" && (
