@@ -44,6 +44,7 @@ export default function RegisterPage() {
         password,
         role,
       }),
+     });
 
       saveAuth(data);
 
@@ -70,11 +71,11 @@ export default function RegisterPage() {
             className="mb-8 flex items-center justify-center gap-2"
           >
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 font-bold text-white">
-              S
+              F
             </div>
 
             <span className="text-xl font-bold">
-              Service<span className="text-blue-600">Connect</span>
+              FeeqTech <span className="text-blue-600">Innovation Network</span>
             </span>
           </Link>
 
@@ -85,7 +86,7 @@ export default function RegisterPage() {
               </h1>
 
               <p className="mt-2 text-sm text-slate-500">
-                Join ServiceConnect today
+                Join FeeqTech Innovation Network today
               </p>
             </div>
 

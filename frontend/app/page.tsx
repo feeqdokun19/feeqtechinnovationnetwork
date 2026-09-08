@@ -87,13 +87,14 @@ export default function Home() {
       <nav className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
           <div className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-lg font-bold text-white">
-              S
-            </div>
-            <span className="text-xl font-bold tracking-tight">
-              Service<span className="text-blue-600">Connect</span>
-            </span>
-          </div>
+           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-lg font-bold text-white">
+            F
+           </div>
+
+          <span className="text-lg font-bold tracking-tight sm:text-xl">
+           FeeqTech <span className="text-blue-600">Innovation Network</span>
+          </span>
+           </div>
 
           <div className="hidden items-center gap-8 md:flex">
             <a
@@ -151,7 +152,7 @@ export default function Home() {
             </h1>
 
             <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-slate-600">
-              ServiceConnect connects you with trusted service providers for
+              FeeqTech Innovation Network connects you with trusted service providers for
               everything from technology and business services to home and
               creative services.
             </p>
@@ -367,7 +368,7 @@ export default function Home() {
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-8 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between lg:px-8">
           <div>
-            © {new Date().getFullYear()} ServiceConnect. All rights reserved.
+            © {new Date().getFullYear()} FeeqTech Innovation Network. All rights reserved.
           </div>
 
           <div className="flex gap-6">

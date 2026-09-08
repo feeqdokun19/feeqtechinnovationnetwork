@@ -13,7 +13,7 @@ async function main() {
   // const email = 'feeq2022@gmail.com';
   // const newPassword = 'Welcome12345';
 
-  const email = 'john@serviceconnect.com';
+  const email = 'test@example.com';
   const newPassword = 'Welcome1234';
 
   const hashedPassword = await bcrypt.hash(newPassword, 12);

@@ -45,15 +45,33 @@ verifyPayment(
   );
 }
 
-  @Get('callback')
-  callback(@Req() request: any) {
-    const reference =
-      request.query.reference || request.query.trxref;
+  
+@Get('callback')
+async callback(@Req() request: any, @Res() response: Response) {
+  const reference =
+    request.query.reference || request.query.trxref;
 
-    return this.paymentsService.verifyPaymentByReference(
-      reference,
+  try {
+    const result =
+      await this.paymentsService.verifyPaymentByReference(
+        reference,
+      );
+
+    const frontendUrl =
+      process.env.FRONTEND_URL || 'http://localhost:3001';
+
+    return response.redirect(
+      `${frontendUrl}/orders/${result.orderId}?payment=success`,
+    );
+  } catch (error) {
+    const frontendUrl =
+      process.env.FRONTEND_URL || 'http://localhost:3001';
+
+    return response.redirect(
+      `${frontendUrl}/orders?payment=failed`,
     );
   }
+}
 
   @Post('webhook')
   async webhook(
