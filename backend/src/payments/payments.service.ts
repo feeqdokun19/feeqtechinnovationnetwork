@@ -6,6 +6,7 @@ import {
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -13,13 +14,12 @@ export class PaymentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly httpService: HttpService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async initializePayment(orderId: string, customerId: string) {
     const order = await this.prisma.order.findUnique({
-      where: {
-        id: orderId,
-      },
+      where: { id: orderId },
       include: {
         customer: true,
         service: true,
@@ -50,10 +50,7 @@ export class PaymentsService {
     }
 
     const reference = `SC-${order.id}-${Date.now()}`;
-
-    const amountInKobo = Math.round(
-      Number(order.amount) * 100,
-    );
+    const amountInKobo = Math.round(Number(order.amount) * 100);
 
     try {
       const response = await firstValueFrom(
@@ -87,8 +84,7 @@ export class PaymentsService {
         );
       }
 
-      const paystackReference =
-        response.data.data.reference;
+      const paystackReference = response.data.data.reference;
 
       await this.prisma.transaction.update({
         where: {
@@ -117,11 +113,6 @@ export class PaymentsService {
     }
   }
 
-  /**
-   * Authenticated payment verification.
-   * Used by:
-   * POST /payments/verify/:reference
-   */
   async verifyPayment(
     reference: string,
     customerId: string,
@@ -155,17 +146,7 @@ export class PaymentsService {
     );
   }
 
-  /**
-   * Paystack callback verification.
-   * Used by:
-   * GET /payments/callback?reference=...
-   *
-   * No JWT is required because Paystack redirects
-   * the customer directly to this endpoint.
-   */
-  async verifyPaymentByReference(
-    reference: string,
-  ) {
+  async verifyPaymentByReference(reference: string) {
     if (!reference) {
       throw new BadRequestException(
         'Payment reference is required',
@@ -192,9 +173,6 @@ export class PaymentsService {
     );
   }
 
-  /**
-   * Common Paystack verification logic.
-   */
   private async verifyPaystackTransaction(
     reference: string,
     transactionId: string,
@@ -290,16 +268,13 @@ export class PaymentsService {
     }
   }
 
-  /**
-   * Mark transaction and order as successfully paid.
-   * Idempotent: repeated webhooks/verifications
-   * will not process the payment twice.
-   */
   private async markPaymentSuccessful(
     transactionId: string,
     orderId: string,
     paidAt?: string,
   ) {
+    let paymentProcessed = false;
+
     await this.prisma.$transaction(async (tx) => {
       const transaction =
         await tx.transaction.findUnique({
@@ -339,6 +314,52 @@ export class PaymentsService {
           status: 'PAID',
         },
       });
+
+      paymentProcessed = true;
+    });
+
+    // Do not create duplicate notifications
+    if (!paymentProcessed) {
+      return;
+    }
+
+    const order = await this.prisma.order.findUnique({
+      where: {
+        id: orderId,
+      },
+      include: {
+        service: true,
+      },
+    });
+
+    if (!order) {
+      return;
+    }
+
+    const amount = Number(order.amount).toLocaleString(
+      'en-NG',
+      {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      },
+    );
+
+    // Notify customer
+    await this.notificationsService.createNotification({
+      userId: order.customerId,
+      orderId: order.id,
+      type: 'PAYMENT_SUCCESS',
+      title: 'Payment successful',
+      message: `Your payment of ₦${amount} for "${order.service.title}" was successful.`,
+    });
+
+    // Notify provider
+    await this.notificationsService.createNotification({
+      userId: order.service.providerId,
+      orderId: order.id,
+      type: 'PAYMENT_RECEIVED',
+      title: 'Payment received',
+      message: `Payment of ₦${amount} has been received for "${order.service.title}".`,
     });
   }
 
@@ -375,7 +396,8 @@ export class PaymentsService {
       Buffer.from(expectedSignature);
 
     if (
-      signatureBuffer.length !== expectedBuffer.length ||
+      signatureBuffer.length !==
+        expectedBuffer.length ||
       !crypto.timingSafeEqual(
         signatureBuffer,
         expectedBuffer,
@@ -394,7 +416,6 @@ export class PaymentsService {
     }
 
     const payment = body.data;
-
     const reference = payment.reference;
 
     if (!reference) {

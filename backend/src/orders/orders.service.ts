@@ -5,10 +5,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 
 @Injectable()
 export class OrdersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   async createOrder(
     customerId: string,
@@ -58,6 +62,14 @@ export class OrdersService {
         },
         transaction: true,
       },
+    });
+
+    await this.notificationsService.createNotification({
+      userId: service.providerId,
+      orderId: order.id,
+      type: 'NEW_ORDER',
+      title: 'New order received',
+      message: `You have received a new order for "${service.title}".`,
     });
 
     return order;
@@ -243,6 +255,26 @@ export class OrdersService {
         transaction: true,
       },
     });
+
+    if (newStatus === 'IN_PROGRESS') {
+      await this.notificationsService.createNotification({
+        userId: order.customerId,
+        orderId: order.id,
+        type: 'ORDER_IN_PROGRESS',
+        title: 'Your order is now in progress',
+        message: `The provider has started working on "${order.service.title}".`,
+      });
+    }
+
+    if (newStatus === 'COMPLETED') {
+      await this.notificationsService.createNotification({
+        userId: order.customerId,
+        orderId: order.id,
+        type: 'ORDER_COMPLETED',
+        title: 'Your order has been completed',
+        message: `Your order for "${order.service.title}" has been completed.`,
+      });
+    }
 
     return {
       message: `Order status updated to ${newStatus}`,

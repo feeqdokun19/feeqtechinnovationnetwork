@@ -8,6 +8,7 @@ import { OrdersModule } from './orders/orders.module.js';
 import { PaymentsModule } from './payments/payments.module.js';
 import { DashboardModule } from './dashboard/dashboard.module.js';
 import { ReviewsModule } from './reviews/reviews.module.js';
+import { NotificationsModule } from './notifications/notifications.module.js';
 
 
 
@@ -20,6 +21,7 @@ import { ReviewsModule } from './reviews/reviews.module.js';
     PaymentsModule,
     DashboardModule,
     ReviewsModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
