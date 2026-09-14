@@ -177,7 +177,7 @@ export default function OrderDetailsPage() {
         method: "POST",
         auth: true,
         body: JSON.stringify({
-          serviceId: order.service.id,
+          orderId: order.id,
           rating,
           comment: comment.trim() || undefined,
         }),
@@ -604,7 +604,9 @@ export default function OrderDetailsPage() {
           )}
 
           {/* Review */}
-          {order.status === "COMPLETED" && (
+          {order.status === "COMPLETED" &&
+            order.providerApproved &&
+            order.customerApproved && (
             <div className="border-b border-slate-100 p-6 sm:p-8">
               <h2 className="text-lg font-bold text-slate-950">
                 Review & Rating
