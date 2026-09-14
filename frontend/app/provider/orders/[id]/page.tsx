@@ -18,6 +18,14 @@ type Order = {
   createdAt: string;
   updatedAt: string;
 
+  providerAccepted: boolean;
+  providerAcceptedAt?: string | null;
+
+  providerApproved: boolean;
+  customerApproved: boolean;
+  providerApprovedAt?: string | null;
+  customerApprovedAt?: string | null;
+
   customer: {
     id: string;
     name: string;
@@ -60,6 +68,15 @@ function formatDate(date: string) {
   });
 }
 
+function formatApprovalDate(date?: string | null) {
+  if (!date) return "";
+
+  return new Date(date).toLocaleString("en-NG", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
 function getStatusClass(status: Order["status"]) {
   switch (status) {
     case "COMPLETED":
@@ -90,6 +107,14 @@ export default function ProviderOrderDetailsPage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [error, setError] = useState("");
+
+  const [approving, setApproving] = useState(false);
+  const [approvalError, setApprovalError] = useState("");
+  const [approvalSuccess, setApprovalSuccess] = useState("");
+
+  const [accepting, setAccepting] = useState(false);
+  const [acceptanceError, setAcceptanceError] = useState("");
+  const [acceptanceSuccess, setAcceptanceSuccess] = useState("");
 
   useEffect(() => {
     const user = getStoredUser();
@@ -152,6 +177,69 @@ export default function ProviderOrderDetailsPage() {
       );
     } finally {
       setUpdating(false);
+    }
+  }
+
+  async function handleApproval() {
+    if (!order) return;
+
+    try {
+      setApproving(true);
+      setApprovalError("");
+      setApprovalSuccess("");
+
+      const data = await apiRequest<{
+        message: string;
+        order: Order;
+      }>(`/orders/${order.id}/provider-approval`, {
+        method: "PATCH",
+        auth: true,
+      });
+
+      setOrder(data.order);
+      setApprovalSuccess(
+        "Your provider approval has been recorded successfully.",
+      );
+    } catch (err) {
+      setApprovalError(
+        err instanceof Error
+          ? err.message
+          : "Unable to approve this order.",
+      );
+    } finally {
+      setApproving(false);
+    }
+  }
+
+  async function handleProviderAcceptance() {
+    if (!order) return;
+
+    try {
+      setAccepting(true);
+      setAcceptanceError("");
+      setAcceptanceSuccess("");
+
+      const data = await apiRequest<{
+        message: string;
+        order: Order;
+      }>(`/orders/${order.id}/provider-acceptance`, {
+        method: "PATCH",
+        auth: true,
+      });
+
+      setOrder(data.order);
+
+      setAcceptanceSuccess(
+        "The customer's request has been accepted successfully.",
+      );
+    } catch (err) {
+      setAcceptanceError(
+        err instanceof Error
+          ? err.message
+          : "Unable to accept this request.",
+      );
+    } finally {
+      setAccepting(false);
     }
   }
 
@@ -425,7 +513,7 @@ export default function ProviderOrderDetailsPage() {
           </div>
 
           {/* Provider Actions */}
-          <div className="p-6 sm:p-8">
+          <div className="border-b border-slate-100 p-6 sm:p-8">
             <h2 className="text-lg font-bold text-slate-950">
               Order Actions
             </h2>
@@ -441,15 +529,59 @@ export default function ProviderOrderDetailsPage() {
             )}
 
             {order.status === "PENDING" && (
-              <div className="mt-5 rounded-xl border border-yellow-200 bg-yellow-50 p-4">
-                <p className="font-semibold text-yellow-800">
-                  Waiting for payment
-                </p>
+              <div className="mt-5 rounded-xl border border-yellow-200 bg-yellow-50 p-5">
+                {!order.providerAccepted ? (
+                  <>
+                    <p className="font-semibold text-yellow-800">
+                      New Service Request
+                    </p>
 
-                <p className="mt-1 text-sm text-yellow-700">
-                  You can start the service after the customer has
-                  successfully paid for this order.
-                </p>
+                    <p className="mt-1 text-sm text-yellow-700">
+                      Review the customer's request and accept it before
+                      the customer proceeds with payment.
+                    </p>
+
+                    {acceptanceError && (
+                      <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                        {acceptanceError}
+                      </div>
+                    )}
+
+                    {acceptanceSuccess && (
+                      <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700">
+                        {acceptanceSuccess}
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleProviderAcceptance}
+                      disabled={accepting}
+                      className="mt-4 w-full rounded-xl bg-blue-600 px-6 py-3.5 font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {accepting
+                        ? "Accepting Request..."
+                        : "Accept Request"}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-semibold text-green-700">
+                      ✓ Request Accepted
+                    </p>
+
+                    <p className="mt-1 text-sm text-green-600">
+                      The request has been accepted. Waiting for the
+                      customer to complete payment.
+                    </p>
+
+                    {order.providerAcceptedAt && (
+                      <p className="mt-2 text-xs text-green-600">
+                        Accepted on {formatApprovalDate(order.providerAcceptedAt)}
+                      </p>
+                    )}
+                  </>
+                )}
               </div>
             )}
 
@@ -503,6 +635,134 @@ export default function ProviderOrderDetailsPage() {
               </div>
             )}
           </div>
+
+          {/* Approval */}
+          {order.status === "COMPLETED" && (
+            <div className="border-b border-slate-100 p-6 sm:p-8">
+              <h2 className="text-lg font-bold text-slate-950">
+                Order Approval
+              </h2>
+
+              <p className="mt-2 text-sm text-slate-500">
+                Confirm that the completed service has been delivered
+                as required.
+              </p>
+
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+
+                {/* Provider Approval */}
+                <div
+                  className={`rounded-xl border p-5 ${
+                    order.providerApproved
+                      ? "border-green-200 bg-green-50"
+                      : "border-yellow-200 bg-yellow-50"
+                  }`}
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Your Approval
+                  </p>
+
+                  {order.providerApproved ? (
+                    <>
+                      <p className="mt-2 font-semibold text-green-700">
+                        ✓ Approved
+                      </p>
+
+                      {order.providerApprovedAt && (
+                        <p className="mt-1 text-sm text-green-600">
+                          {formatApprovalDate(
+                            order.providerApprovedAt,
+                          )}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="mt-2 font-semibold text-yellow-800">
+                        Approval Pending
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={handleApproval}
+                        disabled={approving}
+                        className="mt-4 w-full rounded-xl bg-green-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {approving
+                          ? "Approving Order..."
+                          : "Approve Completed Order"}
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {/* Customer Approval */}
+                <div
+                  className={`rounded-xl border p-5 ${
+                    order.customerApproved
+                      ? "border-green-200 bg-green-50"
+                      : "border-yellow-200 bg-yellow-50"
+                  }`}
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Requester Approval
+                  </p>
+
+                  {order.customerApproved ? (
+                    <>
+                      <p className="mt-2 font-semibold text-green-700">
+                        ✓ Approved
+                      </p>
+
+                      {order.customerApprovedAt && (
+                        <p className="mt-1 text-sm text-green-600">
+                          {formatApprovalDate(
+                            order.customerApprovedAt,
+                          )}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="mt-2 font-semibold text-yellow-800">
+                        Requester approval pending
+                      </p>
+
+                      <p className="mt-2 text-sm text-yellow-700">
+                        The requester still needs to approve the
+                        completed order.
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {approvalError && (
+                <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
+                  {approvalError}
+                </p>
+              )}
+
+              {approvalSuccess && (
+                <p className="mt-4 rounded-lg bg-green-50 p-3 text-sm text-green-700">
+                  {approvalSuccess}
+                </p>
+              )}
+
+              {order.customerApproved &&
+                order.providerApproved && (
+                  <div className="mt-5 rounded-xl border border-green-200 bg-green-50 p-4 text-center">
+                    <p className="font-semibold text-green-700">
+                      ✓ Both parties have approved this completed order.
+                    </p>
+
+                    <p className="mt-1 text-sm text-green-600">
+                      The order approval process is complete.
+                    </p>
+                  </div>
+                )}
+            </div>
+          )}
 
         </div>
       </div>

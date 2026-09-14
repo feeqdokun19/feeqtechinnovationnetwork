@@ -1,3 +1,4 @@
+
 import {
   BadRequestException,
   Injectable,
@@ -42,6 +43,12 @@ export class PaymentsService {
         'This order is not available for payment',
       );
     }
+
+if (!order.providerAccepted) {
+  throw new BadRequestException(
+    'The provider has not accepted this request yet',
+  );
+}
 
     if (!order.transaction) {
       throw new BadRequestException(

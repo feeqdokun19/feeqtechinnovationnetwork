@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { apiRequest, getStoredUser } from "@/lib/api";
 
-
 type Order = {
   id: string;
   status: string;
@@ -13,6 +12,15 @@ type Order = {
   notes?: string | null;
   createdAt: string;
   updatedAt: string;
+
+  providerAccepted: boolean;
+  providerAcceptedAt?: string | null;
+
+  providerApproved: boolean;
+  customerApproved: boolean;
+  providerApprovedAt?: string | null;
+  customerApprovedAt?: string | null;
+
   service: {
     id: string;
     title: string;
@@ -24,13 +32,13 @@ type Order = {
       email: string;
     };
   };
-  
-transaction?: {
-  id: string;
-  status: string;
-  paymentReference?: string | null;
-  amount?: number | string;
-} | null;
+
+  transaction?: {
+    id: string;
+    status: string;
+    paymentReference?: string | null;
+    amount?: number | string;
+  } | null;
 };
 
 function formatCurrency(amount: number | string) {
@@ -61,6 +69,14 @@ function statusClass(status: string) {
   }
 }
 
+function formatApprovalDate(date?: string | null) {
+  if (!date) return "";
+  return new Date(date).toLocaleString("en-NG", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
 export default function OrderDetailsPage() {
   const params = useParams();
   const router = useRouter();
@@ -70,130 +86,162 @@ export default function OrderDetailsPage() {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-const [paying, setPaying] = useState(false);
-const [paymentError, setPaymentError] = useState("");
 
-const [rating, setRating] = useState(0);
-const [comment, setComment] = useState("");
-const [reviewSubmitting, setReviewSubmitting] = useState(false);
-const [reviewError, setReviewError] = useState("");
-const [reviewSuccess, setReviewSuccess] = useState("");
-const [hasReviewed, setHasReviewed] = useState(false);
+  const [paying, setPaying] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
 
-async function 
-    handlePayment() {
-  if (!order) return;
+  const [approving, setApproving] = useState(false);
+  const [approvalError, setApprovalError] = useState("");
+  const [approvalSuccess, setApprovalSuccess] = useState("");
 
-  try {
-    setPaying(true);
-    setPaymentError("");
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewError, setReviewError] = useState("");
+  const [reviewSuccess, setReviewSuccess] = useState("");
+  const [hasReviewed, setHasReviewed] = useState(false);
 
-    const payment = await apiRequest<{
-      authorizationUrl: string;
-      reference: string;
-      orderId: string;
-    }>(`/payments/initialize/${order.id}`, {
-      method: "POST",
-      auth: true,
-    });
+  async function handlePayment() {
+    if (!order) return;
 
-    window.location.href = payment.authorizationUrl;
-  } catch (err) {
-    setPaymentError(
-      err instanceof Error
-        ? err.message
-        : "Unable to initialize payment.",
-    );
-  } finally {
-    setPaying(false);
-  }
-}
+    try {
+      setPaying(true);
+      setPaymentError("");
 
-async function handleReviewSubmit() {
-  if (!order) return;
+      const payment = await apiRequest<{
+        authorizationUrl: string;
+        reference: string;
+        orderId: string;
+      }>(`/payments/initialize/${order.id}`, {
+        method: "POST",
+        auth: true,
+      });
 
-  if (rating < 1 || rating > 5) {
-    setReviewError("Please select a rating from 1 to 5 stars.");
-    return;
+      window.location.href = payment.authorizationUrl;
+    } catch (err) {
+      setPaymentError(
+        err instanceof Error
+          ? err.message
+          : "Unable to initialize payment.",
+      );
+    } finally {
+      setPaying(false);
+    }
   }
 
-  try {
-    setReviewSubmitting(true);
-    setReviewError("");
-    setReviewSuccess("");
+  async function handleApproval() {
+    if (!order) return;
 
-    await apiRequest("/reviews", {
-      method: "POST",
-      auth: true,
-      body: JSON.stringify({
-        serviceId: order.service.id,
-        rating,
-        comment: comment.trim() || undefined,
-      }),
-    });
+    try {
+      setApproving(true);
+      setApprovalError("");
+      setApprovalSuccess("");
 
-    setHasReviewed(true);
-    setReviewSuccess("Your review has been submitted successfully.");
-    setComment("");
-  } catch (err) {
-    setReviewError(
-      err instanceof Error
-        ? err.message
-        : "Unable to submit your review.",
-    );
-  } finally {
-    setReviewSubmitting(false);
+      const data = await apiRequest<{
+        message: string;
+        order: Order;
+      }>(`/orders/${order.id}/customer-approval`, {
+        method: "PATCH",
+        auth: true,
+      });
+
+      setOrder(data.order);
+      setApprovalSuccess(
+        "Your approval has been recorded successfully.",
+      );
+    } catch (err) {
+      setApprovalError(
+        err instanceof Error
+          ? err.message
+          : "Unable to approve this order.",
+      );
+    } finally {
+      setApproving(false);
+    }
   }
-}
 
+  async function handleReviewSubmit() {
+    if (!order) return;
+
+    if (rating < 1 || rating > 5) {
+      setReviewError("Please select a rating from 1 to 5 stars.");
+      return;
+    }
+
+    try {
+      setReviewSubmitting(true);
+      setReviewError("");
+      setReviewSuccess("");
+
+      await apiRequest("/reviews", {
+        method: "POST",
+        auth: true,
+        body: JSON.stringify({
+          serviceId: order.service.id,
+          rating,
+          comment: comment.trim() || undefined,
+        }),
+      });
+
+      setHasReviewed(true);
+      setReviewSuccess("Your review has been submitted successfully.");
+      setComment("");
+    } catch (err) {
+      setReviewError(
+        err instanceof Error
+          ? err.message
+          : "Unable to submit your review.",
+      );
+    } finally {
+      setReviewSubmitting(false);
+    }
+  }
 
   useEffect(() => {
-  const user = getStoredUser();
+    const user = getStoredUser();
 
-  if (!user) {
-    router.push("/login");
-    return;
-  }
-
-  if (orderId) {
-    loadOrder();
-  }
-}, [orderId, router])
-
-
-async function loadOrder() {
-  try {
-    setLoading(true);
-    setError("");
-
-    const data = await apiRequest<Order>(
-      `/orders/${orderId}`,
-      {
-        auth: true,
-      },
-    );
-
-    setOrder(data);
-
-    const paymentStatus =
-      new URLSearchParams(window.location.search).get("payment");
-
-    if (
-      paymentStatus === "success" &&
-      data.status === "PAID"
-    ) {
-      setPaymentError("");
+    if (!user) {
+      router.push("/login");
+      return;
     }
-  } catch (err) {
-    setError(
-      err instanceof Error
-        ? err.message
-        : "Unable to load order.",
-    );
-  } finally {
-    setLoading(false);
-  }
 
+    if (orderId) {
+      loadOrder();
+    }
+  }, [orderId, router]);
+
+  async function loadOrder() {
+    try {
+      setLoading(true);
+      setError("");
+
+      const data = await apiRequest<Order>(
+        `/orders/${orderId}`,
+        {
+          auth: true,
+        },
+      );
+
+      setOrder(data);
+
+      const paymentStatus =
+        new URLSearchParams(window.location.search).get("payment");
+
+      if (
+        paymentStatus === "success" &&
+        data.status === "PAID"
+      ) {
+        setPaymentError("");
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to load order.",
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (loading) {
@@ -208,11 +256,7 @@ async function loadOrder() {
     );
   }
 
-  if (error || !order) {        
-
-
-
-
+  if (error || !order) {
     return (
       <main className="min-h-screen bg-slate-50 p-6">
         <div className="mx-auto max-w-4xl">
@@ -359,30 +403,66 @@ async function loadOrder() {
               </p>
 
               {order.transaction?.paymentReference && (
-               <p className="mt-1 text-xs text-slate-500">
-                 Reference: {order.transaction.paymentReference}
-               </p> 
-                )}
+                <p className="mt-1 text-xs text-slate-500">
+                  Reference: {order.transaction.paymentReference}
+                </p>
+              )}
             </div>
 
-           {order.status === "PENDING" && (
-  <>
-    {paymentError && (
-      <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
-        {paymentError}
-      </p>
-    )}
+            {order.status === "PENDING" && (
+              <>
+                {!order.providerAccepted ? (
+                  <div className="mt-5 rounded-xl border border-yellow-200 bg-yellow-50 p-5">
+                    <p className="font-semibold text-yellow-800">
+                      Waiting for Provider Acceptance
+                    </p>
 
-    <button
-      type="button"
-      onClick={handlePayment}
-      disabled={paying}
-      className="mt-5 w-full rounded-xl bg-blue-600 px-6 py-3.5 font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-    >
-      {paying ? "Connecting to Paystack..." : "Pay Now"}
-    </button>
-  </>
-)}
+                    <p className="mt-1 text-sm leading-6 text-yellow-700">
+                      Your service request has been sent to the provider.
+                      You will be able to make payment once the provider
+                      accepts your request.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="mt-5 rounded-xl border border-green-200 bg-green-50 p-5">
+                      <p className="font-semibold text-green-700">
+                        ✓ Provider Accepted Your Request
+                      </p>
+
+                      <p className="mt-1 text-sm leading-6 text-green-600">
+                        The provider has accepted your request. You can now
+                        proceed with payment.
+                      </p>
+
+                      {order.providerAcceptedAt && (
+                        <p className="mt-2 text-xs text-green-600">
+                          Accepted on{" "}
+                          {formatApprovalDate(order.providerAcceptedAt)}
+                        </p>
+                      )}
+                    </div>
+
+                    {paymentError && (
+                      <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
+                        {paymentError}
+                      </p>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handlePayment}
+                      disabled={paying}
+                      className="mt-5 w-full rounded-xl bg-blue-600 px-6 py-3.5 font-semibold text-white shadow-sm hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {paying
+                        ? "Connecting to Paystack..."
+                        : "Pay Now"}
+                    </button>
+                  </>
+                )}
+              </>
+            )}
 
             {order.status === "PAID" && (
               <div className="mt-5 rounded-xl border border-green-200 bg-green-50 p-4 text-center font-semibold text-green-700">
@@ -402,98 +482,218 @@ async function loadOrder() {
             </p>
           </div>
 
+          {/* Approval */}
+          {order.status === "COMPLETED" && (
+            <div className="border-b border-slate-100 p-6 sm:p-8">
+              <h2 className="text-lg font-bold text-slate-950">
+                Order Approval
+              </h2>
 
-{/* Review */}
-{order.status === "COMPLETED" && (
-  <div className="border-b border-slate-100 p-6 sm:p-8">
-    <h2 className="text-lg font-bold text-slate-950">
-      Review & Rating
-    </h2>
+              <p className="mt-2 text-sm text-slate-500">
+                Confirm that the service has been completed to your
+                satisfaction.
+              </p>
 
-    <p className="mt-2 text-sm text-slate-500">
-      How was your experience with this service?
-    </p>
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
 
-    {!hasReviewed ? (
-      <div className="mt-5">
+                {/* Requester approval */}
+                <div
+                  className={`rounded-xl border p-5 ${
+                    order.customerApproved
+                      ? "border-green-200 bg-green-50"
+                      : "border-yellow-200 bg-yellow-50"
+                  }`}
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Your Approval
+                  </p>
 
-        {/* Star Rating */}
-        <div className="flex gap-2">
-          {[1, 2, 3, 4, 5].map((star) => (
-            <button
-              key={star}
-              type="button"
-              onClick={() => {
-                setRating(star);
-                setReviewError("");
-              }}
-              className={`text-3xl transition ${
-                star <= rating
-                  ? "text-yellow-400"
-                  : "text-slate-300 hover:text-yellow-300"
-              }`}
-              aria-label={`Rate ${star} star${star > 1 ? "s" : ""}`}
-            >
-              ★
-            </button>
-          ))}
-        </div>
+                  {order.customerApproved ? (
+                    <>
+                      <p className="mt-2 font-semibold text-green-700">
+                        ✓ Approved
+                      </p>
 
-        <p className="mt-2 text-sm text-slate-500">
-          {rating === 0
-            ? "Select a rating"
-            : `${rating} out of 5 stars`}
-        </p>
+                      {order.customerApprovedAt && (
+                        <p className="mt-1 text-sm text-green-600">
+                          {formatApprovalDate(
+                            order.customerApprovedAt,
+                          )}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="mt-2 font-semibold text-yellow-800">
+                        Approval Pending
+                      </p>
 
-        {/* Comment */}
-        <textarea
-          value={comment}
-          onChange={(event) => setComment(event.target.value)}
-          placeholder="Tell us about your experience with this service..."
-          rows={4}
-          className="mt-4 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-        />
+                      <button
+                        type="button"
+                        onClick={handleApproval}
+                        disabled={approving}
+                        className="mt-4 w-full rounded-xl bg-green-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {approving
+                          ? "Approving Order..."
+                          : "Approve Completed Order"}
+                      </button>
+                    </>
+                  )}
+                </div>
 
-        {reviewError && (
-          <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-600">
-            {reviewError}
-          </p>
-        )}
+                {/* Provider approval */}
+                <div
+                  className={`rounded-xl border p-5 ${
+                    order.providerApproved
+                      ? "border-green-200 bg-green-50"
+                      : "border-yellow-200 bg-yellow-50"
+                  }`}
+                >
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Provider Approval
+                  </p>
 
-        {reviewSuccess && (
-          <p className="mt-3 rounded-lg bg-green-50 p-3 text-sm text-green-700">
-            {reviewSuccess}
-          </p>
-        )}
+                  {order.providerApproved ? (
+                    <>
+                      <p className="mt-2 font-semibold text-green-700">
+                        ✓ Approved
+                      </p>
 
-        <button
-          type="button"
-          onClick={handleReviewSubmit}
-          disabled={reviewSubmitting}
-          className="mt-4 rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {reviewSubmitting
-            ? "Submitting Review..."
-            : "Submit Review"}
-        </button>
-      </div>
-    ) : (
-      <div className="mt-5 rounded-xl border border-green-200 bg-green-50 p-4">
-        <p className="font-semibold text-green-700">
-          Thank you for your review!
-        </p>
+                      {order.providerApprovedAt && (
+                        <p className="mt-1 text-sm text-green-600">
+                          {formatApprovalDate(
+                            order.providerApprovedAt,
+                          )}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="mt-2 font-semibold text-yellow-800">
+                      Provider approval pending
+                    </p>
+                  )}
+                </div>
+              </div>
 
-        <p className="mt-1 text-sm text-green-600">
-          Your feedback has been submitted successfully.
-        </p>
-      </div>
-    )}
-  </div>
-)}
+              {approvalError && (
+                <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-600">
+                  {approvalError}
+                </p>
+              )}
 
+              {approvalSuccess && (
+                <p className="mt-4 rounded-lg bg-green-50 p-3 text-sm text-green-700">
+                  {approvalSuccess}
+                </p>
+              )}
 
+              {order.customerApproved &&
+                order.providerApproved && (
+                  <div className="mt-5 rounded-xl border border-green-200 bg-green-50 p-4 text-center">
+                    <p className="font-semibold text-green-700">
+                      ✓ Both parties have approved this completed order.
+                    </p>
 
+                    <p className="mt-1 text-sm text-green-600">
+                      The order approval process is complete.
+                    </p>
+                  </div>
+                )}
+            </div>
+          )}
 
+          {/* Review */}
+          {order.status === "COMPLETED" && (
+            <div className="border-b border-slate-100 p-6 sm:p-8">
+              <h2 className="text-lg font-bold text-slate-950">
+                Review & Rating
+              </h2>
+
+              <p className="mt-2 text-sm text-slate-500">
+                How was your experience with this service?
+              </p>
+
+              {!hasReviewed ? (
+                <div className="mt-5">
+
+                  {/* Star Rating */}
+                  <div className="flex gap-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        type="button"
+                        onClick={() => {
+                          setRating(star);
+                          setReviewError("");
+                        }}
+                        className={`text-3xl transition ${
+                          star <= rating
+                            ? "text-yellow-400"
+                            : "text-slate-300 hover:text-yellow-300"
+                        }`}
+                        aria-label={`Rate ${star} star${
+                          star > 1 ? "s" : ""
+                        }`}
+                      >
+                        ★
+                      </button>
+                    ))}
+                  </div>
+
+                  <p className="mt-2 text-sm text-slate-500">
+                    {rating === 0
+                      ? "Select a rating"
+                      : `${rating} out of 5 stars`}
+                  </p>
+
+                  {/* Comment */}
+                  <textarea
+                    value={comment}
+                    onChange={(event) =>
+                      setComment(event.target.value)
+                    }
+                    placeholder="Tell us about your experience with this service..."
+                    rows={4}
+                    className="mt-4 w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+
+                  {reviewError && (
+                    <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-600">
+                      {reviewError}
+                    </p>
+                  )}
+
+                  {reviewSuccess && (
+                    <p className="mt-3 rounded-lg bg-green-50 p-3 text-sm text-green-700">
+                      {reviewSuccess}
+                    </p>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleReviewSubmit}
+                    disabled={reviewSubmitting}
+                    className="mt-4 rounded-xl bg-blue-600 px-6 py-3 font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {reviewSubmitting
+                      ? "Submitting Review..."
+                      : "Submit Review"}
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-5 rounded-xl border border-green-200 bg-green-50 p-4">
+                  <p className="font-semibold text-green-700">
+                    Thank you for your review!
+                  </p>
+
+                  <p className="mt-1 text-sm text-green-600">
+                    Your feedback has been submitted successfully.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Timeline */}
           <div className="p-6 sm:p-8">
@@ -530,6 +730,46 @@ async function loadOrder() {
                       Last updated{" "}
                       {new Date(order.updatedAt).toLocaleString("en-NG")}
                     </p>
+                  </div>
+                </div>
+              )}
+
+              {order.providerApproved && (
+                <div className="flex gap-4">
+                  <div className="mt-1 h-3 w-3 shrink-0 rounded-full bg-green-600" />
+
+                  <div>
+                    <p className="font-semibold text-slate-900">
+                      Provider Approved
+                    </p>
+
+                    {order.providerApprovedAt && (
+                      <p className="text-sm text-slate-500">
+                        {formatApprovalDate(
+                          order.providerApprovedAt,
+                        )}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {order.customerApproved && (
+                <div className="flex gap-4">
+                  <div className="mt-1 h-3 w-3 shrink-0 rounded-full bg-green-600" />
+
+                  <div>
+                    <p className="font-semibold text-slate-900">
+                      Requester Approved
+                    </p>
+
+                    {order.customerApprovedAt && (
+                      <p className="text-sm text-slate-500">
+                        {formatApprovalDate(
+                          order.customerApprovedAt,
+                        )}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}

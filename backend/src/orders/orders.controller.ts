@@ -78,4 +78,41 @@ export class OrdersController {
       body.status,
     );
   }
+
+@Patch(':id/provider-acceptance')
+@Roles('PROVIDER')
+acceptByProvider(
+  @Param('id') orderId: string,
+  @Req() request: any,
+) {
+  return this.ordersService.acceptByProvider(
+    orderId,
+    request.user.id,
+  );
+}
+
+
+  @Patch(':id/provider-approval')
+  @Roles('PROVIDER')
+  approveByProvider(
+    @Param('id') orderId: string,
+    @Req() request: any,
+  ) {
+    return this.ordersService.approveByProvider(
+      orderId,
+      request.user.id,
+    );
+  }
+
+  @Patch(':id/customer-approval')
+  @Roles('CUSTOMER')
+  approveByCustomer(
+    @Param('id') orderId: string,
+    @Req() request: any,
+  ) {
+    return this.ordersService.approveByCustomer(
+      orderId,
+      request.user.id,
+    );
+  }
 }

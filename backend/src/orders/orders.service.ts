@@ -281,4 +281,244 @@ export class OrdersService {
       order: updatedOrder,
     };
   }
+
+
+async acceptByProvider(
+  orderId: string,
+  providerId: string,
+) {
+  const order = await this.prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      service: true,
+    },
+  });
+
+  if (!order) {
+    throw new NotFoundException('Order not found');
+  }
+
+  if (order.service.providerId !== providerId) {
+    throw new ForbiddenException(
+      'Only the service provider can accept this order',
+    );
+  }
+
+  if (order.status !== 'PENDING') {
+    throw new BadRequestException(
+      'Only a pending order can be accepted',
+    );
+  }
+
+  if (order.providerAccepted) {
+    throw new BadRequestException(
+      'This order has already been accepted by the provider',
+    );
+  }
+
+  const updatedOrder = await this.prisma.order.update({
+    where: { id: orderId },
+    data: {
+      providerAccepted: true,
+      providerAcceptedAt: new Date(),
+    },
+    include: {
+      customer: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          phone: true,
+        },
+      },
+      service: {
+        include: {
+          provider: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+        },
+      },
+      transaction: true,
+    },
+  });
+
+  await this.notificationsService.createNotification({
+    userId: order.customerId,
+    orderId: order.id,
+    type: 'PROVIDER_ACCEPTED',
+    title: 'Provider accepted your request',
+    message: `The provider has accepted your request for "${order.service.title}".`,
+  });
+
+  return {
+    message: 'Order accepted successfully by provider',
+    order: updatedOrder,
+  };
+}
+
+  async approveByProvider(
+    orderId: string,
+    providerId: string,
+  ) {
+    const order = await this.prisma.order.findUnique({
+      where: {
+        id: orderId,
+      },
+      include: {
+        service: true,
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (order.service.providerId !== providerId) {
+      throw new ForbiddenException(
+        'Only the service provider can approve this order',
+      );
+    }
+
+    if (order.status !== 'COMPLETED') {
+      throw new BadRequestException(
+        'Only a completed order can be approved',
+      );
+    }
+
+    if (order.providerApproved) {
+      throw new BadRequestException(
+        'This order has already been approved by the provider',
+      );
+    }
+
+    const updatedOrder = await this.prisma.order.update({
+      where: {
+        id: orderId,
+      },
+      data: {
+        providerApproved: true,
+        providerApprovedAt: new Date(),
+      },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+        service: {
+          include: {
+            provider: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
+        transaction: true,
+      },
+    });
+
+    await this.notificationsService.createNotification({
+      userId: order.customerId,
+      orderId: order.id,
+      type: 'PROVIDER_APPROVED',
+      title: 'Provider approved your order',
+      message: `The provider has approved your completed order for "${order.service.title}".`,
+    });
+
+    return {
+      message: 'Order approved successfully by provider',
+      order: updatedOrder,
+    };
+  }
+
+  async approveByCustomer(
+    orderId: string,
+    customerId: string,
+  ) {
+    const order = await this.prisma.order.findUnique({
+      where: {
+        id: orderId,
+      },
+      include: {
+        service: true,
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (order.customerId !== customerId) {
+      throw new ForbiddenException(
+        'Only the requester can approve this order',
+      );
+    }
+
+    if (order.status !== 'COMPLETED') {
+      throw new BadRequestException(
+        'Only a completed order can be approved',
+      );
+    }
+
+    if (order.customerApproved) {
+      throw new BadRequestException(
+        'This order has already been approved by the requester',
+      );
+    }
+
+    const updatedOrder = await this.prisma.order.update({
+      where: {
+        id: orderId,
+      },
+      data: {
+        customerApproved: true,
+        customerApprovedAt: new Date(),
+      },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+        service: {
+          include: {
+            provider: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
+        transaction: true,
+      },
+    });
+
+    await this.notificationsService.createNotification({
+      userId: order.service.providerId,
+      orderId: order.id,
+      type: 'CUSTOMER_APPROVED',
+      title: 'Requester approved your order',
+      message: `The requester has approved the completed order for "${order.service.title}".`,
+    });
+
+    return {
+      message: 'Order approved successfully by requester',
+      order: updatedOrder,
+    };
+  }
 }
