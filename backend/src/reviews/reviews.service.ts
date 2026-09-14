@@ -12,40 +12,46 @@ export class ReviewsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(customerId: string, createReviewDto: CreateReviewDto) {
-    const { serviceId, rating, comment } = createReviewDto;
+    const { orderId, rating, comment } = createReviewDto;
 
-    const service = await this.prisma.service.findUnique({
-      where: { id: serviceId },
-    });
-
-    if (!service) {
-      throw new NotFoundException('Service not found');
-    }
-
-    const completedOrder = await this.prisma.order.findFirst({
-      where: {
-        customerId,
-        serviceId,
-        status: 'COMPLETED',
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      include: {
+        service: true,
       },
     });
 
-    if (!completedOrder) {
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (order.customerId !== customerId) {
       throw new ForbiddenException(
-        'You can only review a service after completing an order',
+        'Only the requester can review this order',
       );
     }
 
-    const existingReview = await this.prisma.review.findFirst({
+    if (order.status !== 'COMPLETED') {
+      throw new ForbiddenException(
+        'You can only review an order after it has been completed',
+      );
+    }
+
+    if (!order.providerApproved || !order.customerApproved) {
+      throw new ForbiddenException(
+        'You can only review an order after both the provider and requester have approved it',
+      );
+    }
+
+    const existingReview = await this.prisma.review.findUnique({
       where: {
-        userId: customerId,
-        serviceId,
+        orderId,
       },
     });
 
     if (existingReview) {
       throw new BadRequestException(
-        'You have already reviewed this service',
+        'You have already reviewed this order',
       );
     }
 
@@ -54,7 +60,8 @@ export class ReviewsService {
         rating,
         comment,
         userId: customerId,
-        serviceId,
+        serviceId: order.serviceId,
+        orderId,
       },
       include: {
         user: {
