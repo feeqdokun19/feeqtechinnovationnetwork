@@ -42,3 +42,6 @@ coverage/
 # Prisma
 prisma/*.db
 prisma/*.db-journal
+
+*.save
+*.backup
