@@ -319,6 +319,9 @@ if (!order.providerAccepted) {
         },
         data: {
           status: 'PAID',
+          paidAt: paidAt
+            ? new Date(paidAt)
+            : new Date(),
         },
       });
 
@@ -351,15 +354,6 @@ if (!order.providerAccepted) {
       },
     );
 
-    // Notify customer
-    await this.notificationsService.createNotification({
-      userId: order.customerId,
-      orderId: order.id,
-      type: 'PAYMENT_SUCCESS',
-      title: 'Payment successful',
-      message: `Your payment of ₦${amount} for "${order.service.title}" was successful.`,
-    });
-
     // Notify provider
     await this.notificationsService.createNotification({
       userId: order.service.providerId,
@@ -367,6 +361,15 @@ if (!order.providerAccepted) {
       type: 'PAYMENT_RECEIVED',
       title: 'Payment received',
       message: `Payment of ₦${amount} has been received for "${order.service.title}".`,
+    });
+
+     // Notify customer
+     await this.prisma.orderEvent.create({
+      data: {
+        orderId: order.id,
+        type: 'PAYMENT_RECEIVED',
+        message: `Payment of ₦${amount} received for "${order.service.title}".`,
+      },
     });
   }
 

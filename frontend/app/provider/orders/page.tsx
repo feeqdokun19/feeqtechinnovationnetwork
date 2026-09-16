@@ -35,6 +35,13 @@ type Order = {
   notes?: string | null;
   createdAt: string;
   updatedAt: string;
+
+  providerAccepted: boolean;
+  providerAcceptedAt?: string | null;
+
+  providerDeclinedAt?: string | null;
+  providerDeclineReason?: string | null;
+
   customer: Customer;
   service: Service;
   transaction?: Transaction | null;
@@ -47,6 +54,9 @@ export default function ProviderOrdersPage() {
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [error, setError] = useState("");
+
+  const [decliningId, setDecliningId] = useState<string | null>(null);
+  const [declineReason, setDeclineReason] = useState("");
 
   useEffect(() => {
     const user = getStoredUser();
@@ -77,6 +87,75 @@ export default function ProviderOrdersPage() {
       );
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function acceptRequest(orderId: string) {
+    try {
+      setUpdatingId(orderId);
+      setError("");
+  
+      const data = await apiRequest<{ message: string; order: Order }>(
+        `/orders/${orderId}/provider-acceptance`,
+        {
+          method: "PATCH",
+          auth: true,
+        },
+      );
+  
+      setOrders((current) =>
+        current.map((order) =>
+          order.id === orderId ? data.order : order,
+        ),
+      );
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to accept this request.",
+      );
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
+  async function declineRequest(orderId: string) {
+    if (!declineReason.trim()) {
+      setError("Please provide a reason for declining the request.");
+      return;
+    }
+  
+    try {
+      setUpdatingId(orderId);
+      setError("");
+  
+      const data = await apiRequest<{ message: string; order: Order }>(
+        `/orders/${orderId}/provider-decline`,
+        {
+          method: "PATCH",
+          auth: true,
+          body: JSON.stringify({
+            reason: declineReason.trim(),
+          }),
+        },
+      );
+  
+      setOrders((current) =>
+        current.map((order) =>
+          order.id === orderId ? data.order : order,
+        ),
+      );
+  
+      setDecliningId(null);
+      setDeclineReason("");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to decline this request.",
+      );
+    } finally {
+      setUpdatingId(null);
     }
   }
 
@@ -352,6 +431,75 @@ export default function ProviderOrdersPage() {
                     >
                       View Details
                     </Link>
+
+                    {order.status === "PENDING" && !order.providerAccepted && (
+  <>
+    {decliningId === order.id ? (
+      <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+        <p className="mb-2 text-xs font-semibold text-red-800">
+          Reason for declining
+        </p>
+
+        <textarea
+          value={declineReason}
+          onChange={(event) => setDeclineReason(event.target.value)}
+          placeholder="Enter reason..."
+          rows={3}
+          className="w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-red-400"
+        />
+
+        <div className="mt-3 flex gap-2">
+          <button
+            onClick={() => declineRequest(order.id)}
+            disabled={updatingId === order.id}
+            className="flex-1 rounded-lg bg-red-600 px-3 py-2 text-xs font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {updatingId === order.id
+              ? "Declining..."
+              : "Confirm Decline"}
+          </button>
+
+          <button
+            onClick={() => {
+              setDecliningId(null);
+              setDeclineReason("");
+            }}
+            disabled={updatingId === order.id}
+            className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    ) : (
+      <>
+        <button
+          onClick={() => acceptRequest(order.id)}
+          disabled={updatingId === order.id}
+          className="rounded-lg bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {updatingId === order.id
+            ? "Accepting..."
+            : "Accept Request"}
+        </button>
+
+        <button
+          onClick={() => setDecliningId(order.id)}
+          disabled={updatingId === order.id}
+          className="rounded-lg border border-red-200 bg-white px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Decline Request
+        </button>
+      </>
+    )}
+  </>
+)}
+
+{order.status === "PENDING" && order.providerAccepted && (
+  <div className="rounded-lg bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+    Request accepted. Waiting for customer payment.
+  </div>
+)}
 
                     {order.status === "PAID" && (
                       <button

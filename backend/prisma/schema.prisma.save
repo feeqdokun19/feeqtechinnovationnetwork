@@ -13,10 +13,6 @@ model User {
   password  String
   phone     String?
   role      Role     @default(CUSTOMER)
-
-  verificationStatus VerificationStatus @default(UNVERIFIED)
-  verifiedAt         DateTime?
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -26,24 +22,6 @@ model User {
   reviews             Review[]
   passwordResetTokens PasswordResetToken[]
   notifications       Notification[]
-  verificationRequests VerificationRequest[]
-}
-
-model VerificationRequest {
-  id              String             @id @default(cuid())
-  userId          String
-  status          VerificationStatus @default(PENDING)
-  submittedAt     DateTime           @default(now())
-  reviewedAt      DateTime?
-  rejectionReason String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([userId])
-  @@index([status])
 }
 
 model PasswordResetToken {
@@ -84,22 +62,17 @@ model Order {
   status     OrderStatus @default(PENDING)
   notes      String?
 
-providerAccepted   Boolean   @default(false)
-providerAcceptedAt DateTime?
+  providerAccepted   Boolean   @default(false)
+  providerAcceptedAt DateTime?
 
-providerDeclinedAt    DateTime?
-providerDeclineReason String?
 
-scheduledAt DateTime?
-paidAt      DateTime?
-startedAt   DateTime?
-completedAt DateTime?
-closedAt    DateTime?
+  providerDeclinedAt    DateTime?
+  providerDeclineReason String?
 
-providerApproved   Boolean   @default(false)
-customerApproved   Boolean   @default(false)
-providerApprovedAt DateTime?
-customerApprovedAt DateTime?
+  providerApproved   Boolean   @default(false)
+  customerApproved   Boolean   @default(false)
+  providerApprovedAt DateTime?
+  customerApprovedAt DateTime?
 
   customer    User         @relation(fields: [customerId], references: [id])
   service     Service      @relation(fields: [serviceId], references: [id])
@@ -107,39 +80,9 @@ customerApprovedAt DateTime?
 
   notifications Notification[]
   review        Review?
-  events OrderEvent[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-}
-
-enum OrderEventType {
-  ORDER_CREATED
-  PROVIDER_ACCEPTED
-  PROVIDER_DECLINED
-  PAYMENT_RECEIVED
-  DATE_CHANGED
-  SERVICE_STARTED
-  SERVICE_COMPLETED
-  PROVIDER_APPROVED
-  CUSTOMER_APPROVED
-  INVOICE_GENERATED
-  WALLET_CREDITED
-  ORDER_CLOSED
-}
-
-model OrderEvent {
-  id        String         @id @default(cuid())
-  orderId   String
-  type      OrderEventType
-  message   String?
-  createdAt DateTime       @default(now())
-
-  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
-
-  @@index([orderId])
-  @@index([type])
-  @@index([createdAt])
 }
 
 model Transaction {
@@ -214,11 +157,4 @@ enum TransactionStatus {
   SUCCESS
   FAILED
   REVERSED
-}
-
-enum VerificationStatus {
-  UNVERIFIED
-  PENDING
-  VERIFIED
-  REJECTED
 }

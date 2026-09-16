@@ -396,4 +396,96 @@ export class AuthService {
       message: 'Password changed successfully',
     };
   }
+
+  async getVerificationStatus(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        verificationStatus: true,
+        verifiedAt: true,
+        verificationRequests: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+          take: 1,
+          select: {
+            id: true,
+            status: true,
+            submittedAt: true,
+            reviewedAt: true,
+            rejectionReason: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    return {
+      verificationStatus: user.verificationStatus,
+      verifiedAt: user.verifiedAt,
+      latestRequest:
+        user.verificationRequests[0] ?? null,
+    };
+  }
+
+  async submitVerification(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        verificationStatus: true,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    if (user.verificationStatus === 'VERIFIED') {
+      throw new ConflictException(
+        'Your account is already verified',
+      );
+    }
+
+    if (user.verificationStatus === 'PENDING') {
+      throw new ConflictException(
+        'Your verification request is already under review',
+      );
+    }
+
+    const verificationRequest =
+      await this.prisma.$transaction(async (tx) => {
+        const request =
+          await tx.verificationRequest.create({
+            data: {
+              userId,
+              status: 'PENDING',
+            },
+          });
+
+        await tx.user.update({
+          where: { id: userId },
+          data: {
+            verificationStatus: 'PENDING',
+          },
+        });
+
+        return request;
+      });
+
+    return {
+      message:
+        'Verification request submitted successfully',
+      verificationStatus: 'PENDING',
+      request: {
+        id: verificationRequest.id,
+        status: verificationRequest.status,
+        submittedAt: verificationRequest.submittedAt,
+      },
+    };
+  }
 }

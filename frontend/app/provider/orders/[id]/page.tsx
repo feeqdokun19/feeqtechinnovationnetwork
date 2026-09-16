@@ -17,9 +17,19 @@ type Order = {
   notes?: string | null;
   createdAt: string;
   updatedAt: string;
-
+  
   providerAccepted: boolean;
   providerAcceptedAt?: string | null;
+  
+  scheduledAt?: string | null;
+  paidAt?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  closedAt?: string | null;
+
+  
+  providerDeclinedAt?: string | null;
+  providerDeclineReason?: string | null;
 
   providerApproved: boolean;
   customerApproved: boolean;
@@ -116,6 +126,13 @@ export default function ProviderOrderDetailsPage() {
   const [acceptanceError, setAcceptanceError] = useState("");
   const [acceptanceSuccess, setAcceptanceSuccess] = useState("");
 
+  const [declining, setDeclining] = useState(false);
+  const [declineError, setDeclineError] = useState("");
+  const [declineSuccess, setDeclineSuccess] = useState("");
+  const [showDeclineForm, setShowDeclineForm] = useState(false);
+  const [declineReason, setDeclineReason] = useState("");
+  const [declineDetails, setDeclineDetails] = useState("");
+
   useEffect(() => {
     const user = getStoredUser();
 
@@ -137,7 +154,17 @@ export default function ProviderOrderDetailsPage() {
       const data = await apiRequest<Order>(`/orders/${orderId}`, {
         auth: true,
       });
-
+      
+      console.log("=== PROVIDER ORDER DEBUG ===");
+      console.log("Order ID:", data.id);
+      console.log("Order Status:", data.status);
+      console.log("Provider Accepted:", data.providerAccepted);
+      console.log("Provider Approved:", data.providerApproved);
+      console.log("Customer Approved:", data.customerApproved);
+      console.log("Provider Approved At:", data.providerApprovedAt);
+      console.log("Customer Approved At:", data.customerApprovedAt);
+      console.log("Full Order:", data);
+      
       setOrder(data);
     } catch (err) {
       setError(
@@ -240,6 +267,49 @@ export default function ProviderOrderDetailsPage() {
       );
     } finally {
       setAccepting(false);
+    }
+  }
+
+  async function handleProviderDecline() {
+    if (!order) return;
+
+    const reason =
+      declineReason === "Other"
+        ? declineDetails.trim()
+        : declineReason;
+
+    if (!reason) {
+      setDeclineError("Please select a reason for declining this request.");
+      return;
+    }
+
+    try {
+      setDeclining(true);
+      setDeclineError("");
+      setDeclineSuccess("");
+
+      const data = await apiRequest<{
+        message: string;
+        order: Order;
+      }>(`/orders/${order.id}/provider-decline`, {
+        method: "PATCH",
+        auth: true,
+        body: JSON.stringify({ reason }),
+      });
+
+      setOrder(data.order);
+      setShowDeclineForm(false);
+      setDeclineSuccess(
+        "The customer's request has been declined successfully.",
+      );
+    } catch (err) {
+      setDeclineError(
+        err instanceof Error
+          ? err.message
+          : "Unable to decline this request.",
+      );
+    } finally {
+      setDeclining(false);
     }
   }
 
@@ -499,18 +569,245 @@ export default function ProviderOrderDetailsPage() {
             </div>
           </div>
 
-          {/* Customer Notes */}
+          </div>
+
+          {/* Order Timeline */}
           <div className="border-b border-slate-100 p-6 sm:p-8">
             <h2 className="text-lg font-bold text-slate-950">
-              Customer Notes
+              Order Timeline
             </h2>
 
-            <div className="mt-4 rounded-xl bg-slate-50 p-5">
-              <p className="whitespace-pre-wrap leading-7 text-slate-600">
-                {order.notes || "No additional notes were provided."}
-              </p>
+            <p className="mt-2 text-sm text-slate-500">
+              Track the progress of this order from request to completion.
+            </p>
+
+            <div className="mt-6 space-y-6">
+              {/* Request Created */}
+              <div className="flex gap-4">
+                <div className="flex flex-col items-center">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-blue-700">
+                    ✓
+                  </div>
+                  <div className="mt-2 h-full w-px bg-slate-200" />
+                </div>
+
+                <div className="pb-2">
+                  <p className="font-semibold text-slate-900">
+                    Request Created
+                  </p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {formatDate(order.createdAt)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Provider Accepted */}
+              <div className="flex gap-4">
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-full ${
+                      order.providerAccepted
+                        ? "bg-green-100 text-green-700"
+                        : "bg-slate-100 text-slate-400"
+                    }`}
+                  >
+                    {order.providerAccepted ? "✓" : "•"}
+                  </div>
+                  <div className="mt-2 h-full w-px bg-slate-200" />
+                </div>
+
+                <div className="pb-2">
+                  <p
+                    className={`font-semibold ${
+                      order.providerAccepted
+                        ? "text-slate-900"
+                        : "text-slate-400"
+                    }`}
+                  >
+                    Provider Accepted
+                  </p>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    {order.providerAcceptedAt
+                      ? formatDate(order.providerAcceptedAt)
+                      : "Waiting for provider acceptance"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Payment Received */}
+              <div className="flex gap-4">
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-full ${
+                      order.paidAt
+                        ? "bg-green-100 text-green-700"
+                        : "bg-slate-100 text-slate-400"
+                    }`}
+                  >
+                    {order.paidAt ? "✓" : "•"}
+                  </div>
+                  <div className="mt-2 h-full w-px bg-slate-200" />
+                </div>
+
+                <div className="pb-2">
+                  <p
+                    className={`font-semibold ${
+                      order.paidAt
+                        ? "text-slate-900"
+                        : "text-slate-400"
+                    }`}
+                  >
+                    Payment Received
+                  </p>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    {order.paidAt
+                      ? formatDate(order.paidAt)
+                      : "Waiting for customer payment"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Service Started */}
+              <div className="flex gap-4">
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-full ${
+                      order.startedAt
+                        ? "bg-green-100 text-green-700"
+                        : "bg-slate-100 text-slate-400"
+                    }`}
+                  >
+                    {order.startedAt ? "✓" : "•"}
+                  </div>
+                  <div className="mt-2 h-full w-px bg-slate-200" />
+                </div>
+
+                <div className="pb-2">
+                  <p
+                    className={`font-semibold ${
+                      order.startedAt
+                        ? "text-slate-900"
+                        : "text-slate-400"
+                    }`}
+                  >
+                    Service Started
+                  </p>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    {order.startedAt
+                      ? formatDate(order.startedAt)
+                      : "Waiting for service to start"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Service Completed */}
+              <div className="flex gap-4">
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-full ${
+                      order.completedAt
+                        ? "bg-green-100 text-green-700"
+                        : "bg-slate-100 text-slate-400"
+                    }`}
+                  >
+                    {order.completedAt ? "✓" : "•"}
+                  </div>
+                  <div className="mt-2 h-full w-px bg-slate-200" />
+                </div>
+
+                <div className="pb-2">
+                  <p
+                    className={`font-semibold ${
+                      order.completedAt
+                        ? "text-slate-900"
+                        : "text-slate-400"
+                    }`}
+                  >
+                    Service Completed
+                  </p>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    {order.completedAt
+                      ? formatDate(order.completedAt)
+                      : "Waiting for service completion"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Provider Approval */}
+              <div className="flex gap-4">
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-full ${
+                      order.providerApproved
+                        ? "bg-green-100 text-green-700"
+                        : "bg-slate-100 text-slate-400"
+                    }`}
+                  >
+                    {order.providerApproved ? "✓" : "•"}
+                  </div>
+                  <div className="mt-2 h-full w-px bg-slate-200" />
+                </div>
+
+                <div className="pb-2">
+                  <p
+                    className={`font-semibold ${
+                      order.providerApproved
+                        ? "text-slate-900"
+                        : "text-slate-400"
+                    }`}
+                  >
+                    Provider Approved
+                  </p>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    {order.providerApprovedAt
+                      ? formatDate(order.providerApprovedAt)
+                      : "Waiting for provider approval"}
+                  </p>
+                </div>
+              </div>
+
+              {/* Customer Approval */}
+              <div className="flex gap-4">
+                <div className="flex flex-col items-center">
+                  <div
+                    className={`flex h-9 w-9 items-center justify-center rounded-full ${
+                      order.customerApproved
+                        ? "bg-green-100 text-green-700"
+                        : "bg-slate-100 text-slate-400"
+                    }`}
+                  >
+                    {order.customerApproved ? "✓" : "•"}
+                  </div>
+                </div>
+
+                <div>
+                  <p
+                    className={`font-semibold ${
+                      order.customerApproved
+                        ? "text-slate-900"
+                        : "text-slate-400"
+                    }`}
+                  >
+                    Customer Approved
+                  </p>
+
+                  <p className="mt-1 text-sm text-slate-500">
+                    {order.customerApprovedAt
+                      ? formatDate(order.customerApprovedAt)
+                      : "Waiting for customer approval"}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
+
+          {/* Customer Notes */}
+          <div className="border-b border-slate-100 p-6 sm:p-8">
 
           {/* Provider Actions */}
           <div className="border-b border-slate-100 p-6 sm:p-8">
@@ -553,16 +850,109 @@ export default function ProviderOrderDetailsPage() {
                       </div>
                     )}
 
-                    <button
-                      type="button"
-                      onClick={handleProviderAcceptance}
-                      disabled={accepting}
-                      className="mt-4 w-full rounded-xl bg-blue-600 px-6 py-3.5 font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {accepting
-                        ? "Accepting Request..."
-                        : "Accept Request"}
-                    </button>
+                    {!showDeclineForm ? (
+                      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        <button
+                          type="button"
+                          onClick={handleProviderAcceptance}
+                          disabled={accepting || declining}
+                          className="rounded-xl bg-blue-600 px-6 py-3.5 font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {accepting
+                            ? "Accepting Request..."
+                            : "Accept Request"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setDeclineError("");
+                            setShowDeclineForm(true);
+                          }}
+                          disabled={accepting || declining}
+                          className="rounded-xl border border-red-300 bg-white px-6 py-3.5 font-semibold text-red-700 transition hover:bg-red-50 disabled:opacity-60"
+                        >
+                          Decline Request
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="mt-4 rounded-xl border border-red-200 bg-white p-4">
+                        <p className="font-semibold text-slate-900">
+                          Decline Request
+                        </p>
+
+                        <p className="mt-1 text-sm text-slate-500">
+                          Please select a reason.
+                        </p>
+
+                        <div className="mt-4 space-y-2">
+                          {[
+                            "I'm currently unavailable",
+                            "The request is outside my service scope",
+                            "The requested schedule does not work for me",
+                            "Other",
+                          ].map((reason) => (
+                            <label
+                              key={reason}
+                              className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 p-3 hover:bg-slate-50"
+                            >
+                              <input
+                                type="radio"
+                                name="declineReason"
+                                value={reason}
+                                checked={declineReason === reason}
+                                onChange={(e) =>
+                                  setDeclineReason(e.target.value)
+                                }
+                              />
+                              <span className="text-sm text-slate-700">
+                                {reason}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
+
+                        {declineReason === "Other" && (
+                          <textarea
+                            value={declineDetails}
+                            onChange={(e) =>
+                              setDeclineDetails(e.target.value)
+                            }
+                            rows={3}
+                            placeholder="Please provide a brief reason..."
+                            className="mt-3 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm focus:border-red-400 focus:outline-none"
+                          />
+                        )}
+
+                        {declineError && (
+                          <div className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                            {declineError}
+                          </div>
+                        )}
+
+                        <div className="mt-4 flex gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setShowDeclineForm(false)}
+                            disabled={declining}
+                            className="flex-1 rounded-xl border border-slate-300 px-4 py-3 font-semibold text-slate-700 hover:bg-slate-50"
+                          >
+                            Cancel
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleProviderDecline}
+                            disabled={declining}
+                            className="flex-1 rounded-xl bg-red-600 px-4 py-3 font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                          >
+                            {declining
+                              ? "Declining..."
+                              : "Confirm Decline"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <>
@@ -628,10 +1018,31 @@ export default function ProviderOrderDetailsPage() {
             )}
 
             {order.status === "CANCELLED" && (
-              <div className="mt-5 rounded-xl border border-red-200 bg-red-50 p-4 text-center">
-                <p className="font-semibold text-red-700">
-                  This order has been cancelled.
+              <div className="mt-5 rounded-2xl border border-red-200 bg-red-50 p-5">
+                <p className="font-semibold text-red-800">
+                  Request Declined
                 </p>
+
+                <p className="mt-1 text-sm text-red-700">
+                  This request is no longer available for processing.
+                </p>
+
+                {order.providerDeclineReason && (
+                  <div className="mt-4 rounded-xl border border-red-200 bg-white p-4">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-red-500">
+                      Decline Reason
+                    </p>
+                    <p className="mt-1 text-sm text-slate-700">
+                      {order.providerDeclineReason}
+                    </p>
+                  </div>
+                )}
+
+                {order.providerDeclinedAt && (
+                  <p className="mt-3 text-xs text-red-600">
+                    Declined on {formatApprovalDate(order.providerDeclinedAt)}
+                  </p>
+                )}
               </div>
             )}
           </div>

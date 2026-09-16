@@ -65,6 +65,22 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('verification')
+  getVerificationStatus(@Req() request: any) {
+    return this.authService.getVerificationStatus(
+      request.user.id,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('verification/submit')
+  submitVerification(@Req() request: any) {
+    return this.authService.submitVerification(
+      request.user.id,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Patch('profile')
   updateProfile(
     @Req() request: any,

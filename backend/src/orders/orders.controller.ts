@@ -92,6 +92,20 @@ acceptByProvider(
 }
 
 
+  @Patch(':id/provider-decline')
+  @Roles('PROVIDER')
+  declineByProvider(
+    @Param('id') orderId: string,
+    @Req() request: any,
+    @Body() body: { reason?: string },
+  ) {
+    return this.ordersService.declineByProvider(
+      orderId,
+      request.user.id,
+      body.reason,
+    );
+  }
+
   @Patch(':id/provider-approval')
   @Roles('PROVIDER')
   approveByProvider(

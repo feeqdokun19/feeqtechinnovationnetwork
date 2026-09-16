@@ -39,7 +39,7 @@ export default function ServicesPage() {
 
       const data = await apiRequest<Service[]>("/services");
 
-      setServices(data);
+      setServices(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(
         err instanceof Error

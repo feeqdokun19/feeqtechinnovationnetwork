@@ -72,7 +72,7 @@ export class OrdersService {
       title: 'New order received',
       message: `You have received a new order for "${service.title}".`,
     });
-    
+
     return order;
   }
 
@@ -152,11 +152,6 @@ export class OrdersService {
           },
         },
         transaction: true,
-        events: {
-          orderBy: {
-            createdAt: 'asc',
-          },
-        },
       },
     });
 
@@ -237,12 +232,6 @@ export class OrdersService {
       },
       data: {
         status: newStatus,
-        ...(newStatus === 'IN_PROGRESS'
-          ? { startedAt: new Date() }
-          : {}),
-        ...(newStatus === 'COMPLETED'
-          ? { completedAt: new Date() }
-          : {}),
       },
       include: {
         customer: {
@@ -278,14 +267,6 @@ export class OrdersService {
       });
     }
 
-    await this.prisma.orderEvent.create({
-      data: {
-        orderId: order.id,
-        type: 'SERVICE_STARTED',
-        message: `Service started for "${order.service.title}".`,
-      },
-    });
-
     if (newStatus === 'COMPLETED') {
       await this.notificationsService.createNotification({
         userId: order.customerId,
@@ -295,13 +276,6 @@ export class OrdersService {
         message: `Your order for "${order.service.title}" has been completed.`,
       });
     }
-    await this.prisma.orderEvent.create({
-      data: {
-        orderId: order.id,
-        type: 'SERVICE_COMPLETED',
-        message: `Service completed for "${order.service.title}".`,
-      },
-    });
 
     return {
       message: `Order status updated to ${newStatus}`,
@@ -379,14 +353,6 @@ async acceptByProvider(
     type: 'PROVIDER_ACCEPTED',
     title: 'Provider accepted your request',
     message: `The provider has accepted your request for "${order.service.title}".`,
-  });
-
-  await this.prisma.orderEvent.create({
-    data: {
-      orderId: order.id,
-      type: 'PROVIDER_APPROVED',
-      message: `Provider approved the completed order for "${order.service.title}".`,
-    },
   });
 
   return {
@@ -480,23 +446,14 @@ async acceptByProvider(
         : `The provider declined your request for "${order.service.title}".`,
     });
 
-    await this.prisma.orderEvent.create({
-      data: {
-        orderId: order.id,
-        type: 'PROVIDER_DECLINED',
-        message: declineReason
-          ? `Provider declined the order. Reason: ${declineReason}`
-          : 'Provider declined the order.',
-      },
-    });
-
     return {
       message: 'Order declined successfully by provider',
       order: updatedOrder,
     };
   }
 
-  async approveByProvider(
+  a
+sync approveByProvider(
     orderId: string,
     providerId: string,
   ) {
@@ -569,14 +526,6 @@ async acceptByProvider(
       type: 'PROVIDER_APPROVED',
       title: 'Provider approved your order',
       message: `The provider has approved your completed order for "${order.service.title}".`,
-    });
-
-    await this.prisma.orderEvent.create({
-      data: {
-        orderId: order.id,
-        type: 'PROVIDER_APPROVED',
-        message: `Provider approved the completed order for "${order.service.title}".`,
-      },
     });
 
     return {
@@ -658,14 +607,6 @@ async acceptByProvider(
       type: 'CUSTOMER_APPROVED',
       title: 'Requester approved your order',
       message: `The requester has approved the completed order for "${order.service.title}".`,
-    });
-
-    await this.prisma.orderEvent.create({
-      data: {
-        orderId: order.id,
-        type: 'CUSTOMER_APPROVED',
-        message: `Requester approved the completed order for "${order.service.title}".`,
-      },
     });
 
     return {
