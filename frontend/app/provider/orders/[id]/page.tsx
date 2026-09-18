@@ -806,9 +806,6 @@ export default function ProviderOrderDetailsPage() {
             </div>
           </div>
 
-          {/* Customer Notes */}
-          <div className="border-b border-slate-100 p-6 sm:p-8">
-
           {/* Provider Actions */}
           <div className="border-b border-slate-100 p-6 sm:p-8">
             <h2 className="text-lg font-bold text-slate-950">
@@ -1175,7 +1172,6 @@ export default function ProviderOrderDetailsPage() {
             </div>
           )}
 
-        </div>
       </div>
     </main>
   );

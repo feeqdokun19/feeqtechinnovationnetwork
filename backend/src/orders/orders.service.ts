@@ -384,8 +384,8 @@ async acceptByProvider(
   await this.prisma.orderEvent.create({
     data: {
       orderId: order.id,
-      type: 'PROVIDER_APPROVED',
-      message: `Provider approved the completed order for "${order.service.title}".`,
+      type: 'PROVIDER_ACCEPTED',
+      message: `Provider accepted the service request for "${order.service.title}".`,
     },
   });
 
